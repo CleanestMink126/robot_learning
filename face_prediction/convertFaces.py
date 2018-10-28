@@ -86,6 +86,8 @@ if __name__ == '__main__':
             class_name = ALL_DATA_PATHS[k].split('/')[4]
             labels[k-i] = files_dict[class_name]
         images = FromJPEG.get_batch(ALL_DATA_PATHS[i:j], WIDTH, HEIGHT)
+        print(images.shape)
+        exit()
         # for k in range(10):
         #     print(labels[k])
         #     plt.imshow(images[k])

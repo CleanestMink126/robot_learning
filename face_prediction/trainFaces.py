@@ -57,10 +57,11 @@ def return_datatset_test():
       TEST_LABEL, 1* 4).map(decode_label)
     return tf.data.Dataset.zip((images, labels))
 
-def create_main_model(x_image, reuse = False):
+def create_main_model(x_image, reuse = False, is_train = None):
     '''Create a discrimator, not the convolutions may be negative to represent
         downsampling'''
-
+    if is_train is None:
+        is_train = not reuse
     with tf.variable_scope("main_model") as scope:
         if reuse: #get previous variable if we are reusing the discriminator but with fake images
             scope.reuse_variables()
@@ -76,7 +77,7 @@ def create_main_model(x_image, reuse = False):
                 convVals = Conv2d(convVals,v, (3, 3), act=tf.nn.relu,strides =(1,1),name='conv_%i'%(i))
         flat3 = FlattenLayer(convVals, name ='flatten')
         hid3 = DenseLayer(flat3, HIDDEN_SIZE,act = tf.nn.relu, name ='fcl')
-        hid3 = DropoutLayer(hid3, keep=KEEP_PROB,is_train=(not reuse), is_fix=True, name='drop1')
+        hid3 = DropoutLayer(hid3, keep=KEEP_PROB,is_train=is_train, is_fix=True, name='drop1')
         y_conv = DenseLayer(hid3, 2,  name = 'output').outputs
         return y_conv
 
@@ -155,12 +156,13 @@ def train_model():
 def build_model_inference():
     sess = tf.Session()#start the session
     x = tf.placeholder(dtype=tf.float32, shape=(1,IMAGE_SIZE[0],IMAGE_SIZE[1],IMAGE_SIZE[2]))
-    main_outputs = create_main_model(x)
+    x = tf.manip.reverse(x,axis=-1)
+    main_outputs = create_main_model(x,is_train=False)
     sess.run(tf.global_variables_initializer())
     saver_perm = tf.train.Saver()
     saver_perm.restore(sess, PERM_MODEL_FILEPATH)
     binary_output = tf.argmax(main_outputs,-1,output_type=tf.int32)
-    return sess, x, binary_output
+    return sess, x, main_outputs
 
 
 

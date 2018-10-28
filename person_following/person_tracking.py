@@ -27,7 +27,7 @@ class TrackPerson:
         rospy.init_node('person_tracker')
         print('init')
         self.turn_velocity = 0
-        self.forward_velocity = .2
+        self.forward_velocity = 0
         self.threshold_person = 0.5
         self.threshold_direction = 10 #in pixels
         self.bridge = CvBridge()
@@ -64,9 +64,11 @@ class TrackPerson:
         self.publisher.publish(my_point_stamped)
 
     def run(self):
-        r = rospy.Rate(4)
+        r = rospy.Rate(3)
         directory = '/Data/PersonTracking/test/away/'
         prefix_name = 'away_'
+        curr_val = 1
+        last_val = 1
         while not rospy.is_shutdown():
             # print(self.image)
             # print(self.get_image)
@@ -101,9 +103,10 @@ class TrackPerson:
                 # plt.show()
                 img = self.image
                 img = img[box[0]:box[2],box[1]:box[3]]
-                img = cv.resize(img, (IMAGE_SIZE[0],IMAGE_SIZE[1],IMAGE_SIZE[2]))
+                img = cv2.resize(img, (IMAGE_SIZE[1],IMAGE_SIZE[0]))
+                # print(img.shape)
                 cv2.imshow("image",img)
-                looking = self.detect_looking(img)
+                looking = self.detect_looking(np.expand_dims(img,0))
 
 
                 # print(prefix_name + str(rospy.Time.now())+'.png')
@@ -122,11 +125,19 @@ class TrackPerson:
                     self.turn_velocity = 0
                     self.forward_velocity = MAX_MOVE
                 # print(box_dir)
-                print('Looking:', looking)
-                if looking == 1:
-                    self.forward_velocity = 0
-                    self.send_speed(self.forward_velocity, self.turn_velocity)
-                print('Turn Speed:',self.turn_velocity)
+                self.forward_velocity = 0
+                last_val = curr_val
+                soft_sum = np.sum(np.exp(looking/1000))
+                curr_val = np.exp(looking[1]/1000)/soft_sum
+                if last_val > 0.05 or curr_val > 0.05:
+                    print('----------STOOOOOOP')
+                else:
+                    print('GOOOOOOOO')
+                # print(looking)
+                # if looking == 1:
+                #     self.forward_velocity = 0
+                #     self.send_speed(self.forward_velocity, self.turn_velocity)
+                # print('Turn Speed:',self.turn_velocity)
                 self.image = None
             self.get_image = True
             r.sleep()
