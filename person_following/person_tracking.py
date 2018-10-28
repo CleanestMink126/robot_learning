@@ -24,7 +24,7 @@ class TrackPerson:
         print('init')
         self.turn_velocity = 0
         self.forward_velocity = .2
-        self.threshold_person = 0.4
+        self.threshold_person = 0.5
         self.threshold_direction = 10 #in pixels
         self.bridge = CvBridge()
         self.get_image = False
@@ -56,7 +56,9 @@ class TrackPerson:
         self.publisher.publish(my_point_stamped)
 
     def run(self):
-        r = rospy.Rate(3)
+        r = rospy.Rate(4)
+        directory = '/Data/PersonTracking/test/away/'
+        prefix_name = 'away_'
         while not rospy.is_shutdown():
             # print(self.image)
             # print(self.get_image)
@@ -86,14 +88,17 @@ class TrackPerson:
                 #         break
 
 
-                img = np.squeeze(self.image)
                 # print(img.shape)
                 # plt.imshow(img)
                 # plt.show()
-                cv2.rectangle(img,(box[1],box[0]),(box[3],box[2]),(255,0,0),2)
+                img = self.image
+                img = img[box[0]:box[2],box[1]:box[3]]
                 cv2.imshow("image",img)
+                print(prefix_name + str(rospy.Time.now())+'.png')
+                cv2.imwrite(directory + prefix_name + str(rospy.Time.now())+'.png',img)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
+                    self.send_speed(0,0)
                     break
                 # print('Box Values', box[1] ,box[3])
                 rectange_center = (box[1] + box[3])//2

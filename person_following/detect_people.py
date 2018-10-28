@@ -87,7 +87,10 @@ if __name__ == "__main__":
             # Class 1 represents human
             if classes[i] == 1 and scores[i] > threshold:
                 box = boxes[i]
-                cv2.rectangle(img,(box[1],box[0]),(box[3],box[2]),(255,0,0),2)
+                img = img[box[0]:box[2],box[1]:box[3]]
+                break
+                # cv2.imshow("image",img)
+                # cv2.rectangle(img,(box[1],box[0]),(box[3],box[2]),(255,0,0),2)
 
         cv2.imshow("preview", img)
         key = cv2.waitKey(1)
