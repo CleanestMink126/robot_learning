@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-
+import sys
+sys.path.append('./../face_prediction/')
+import trainFaces
 import rospy
 import rospkg
 from sensor_msgs.msg import Image
@@ -17,6 +19,8 @@ MODEL_PATH = '/Data/ssd_mobilenet_v1_coco_2017_11_17/frozen_inference_graph.pb'
 MAX_TURN = .46
 MAX_MOVE = .2
 MAX_PIXELS = 240
+IMAGE_SIZE = 448,256,3
+
 
 class TrackPerson:
     def __init__(self):
@@ -30,12 +34,16 @@ class TrackPerson:
         self.get_image = False
         self.image = None
         self.model = detect_people.DetectorAPI(path_to_ckpt = MODEL_PATH)
+        self.sess, self.x, self.output = trainFaces.build_model_inference()
         print('model loaded')
 
         self.publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         rospy.Subscriber('camera/image_raw', Image, self.process_image)
         print('ros connected')
 
+    def detect_looking(self, img):
+        looking = self.sess.run(self.output,feed_dict={self.x:img})
+        return np.squeeze(looking)
 
     def process_image(self, m):
         # print('processing')
@@ -93,9 +101,13 @@ class TrackPerson:
                 # plt.show()
                 img = self.image
                 img = img[box[0]:box[2],box[1]:box[3]]
+                img = cv.resize(img, (IMAGE_SIZE[0],IMAGE_SIZE[1],IMAGE_SIZE[2]))
                 cv2.imshow("image",img)
-                print(prefix_name + str(rospy.Time.now())+'.png')
-                cv2.imwrite(directory + prefix_name + str(rospy.Time.now())+'.png',img)
+                looking = self.detect_looking(img)
+
+
+                # print(prefix_name + str(rospy.Time.now())+'.png')
+                # cv2.imwrite(directory + prefix_name + str(rospy.Time.now())+'.png',img)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
                     self.send_speed(0,0)
@@ -110,7 +122,11 @@ class TrackPerson:
                     self.turn_velocity = 0
                     self.forward_velocity = MAX_MOVE
                 # print(box_dir)
-                print(self.turn_velocity)
+                print('Looking:', looking)
+                if looking == 1:
+                    self.forward_velocity = 0
+                    self.send_speed(self.forward_velocity, self.turn_velocity)
+                print('Turn Speed:',self.turn_velocity)
                 self.image = None
             self.get_image = True
             r.sleep()
