@@ -156,8 +156,8 @@ def train_model():
 def build_model_inference():
     sess = tf.Session()#start the session
     x = tf.placeholder(dtype=tf.float32, shape=(1,IMAGE_SIZE[0],IMAGE_SIZE[1],IMAGE_SIZE[2]))
-    x = tf.manip.reverse(x,axis=-1)
-    main_outputs = create_main_model(x,is_train=False)
+    x_rev = tf.reverse(x,axis=[3])/255.0
+    main_outputs = create_main_model(x_rev,is_train=False)
     sess.run(tf.global_variables_initializer())
     saver_perm = tf.train.Saver()
     saver_perm.restore(sess, PERM_MODEL_FILEPATH)
