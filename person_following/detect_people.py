@@ -12,6 +12,7 @@ PAUL
 THIS IS NOT MY CODE.
 I FOUND THIS ONLINE
 -Nick
+-----------------------------------------------
 '''
 
 class DetectorAPI:
