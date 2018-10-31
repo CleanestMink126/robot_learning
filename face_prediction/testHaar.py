@@ -1,23 +1,19 @@
 
-#We should get a glob to get all the image files we want to examine
-#We should get a dictionary to map file paths from the glob to indexes
-#We should read the text files to generate labels for these images_file
-#then we should load the images. When we reach a max value we should write to a binary file
 from glob import glob
 import os
 import numpy as np
 from PIL import Image
 from random import shuffle
 import matplotlib.pyplot as plt
-
-def append_binary_file(file_name, bytes_):
-    with open(file_name,"ab") as f:
-        f.write(bytes_)
+import cv2
+import trainFaces
+'''
+This script is similar to convertFaces with the change that it will test haar
+classifier instead of saving the images
+'''
 
 class FromJPEG:
-    DEBUG = False
-    # Image configuration
-    data_dir = './Models/data'
+    '''Object from another Repo that will load images in appropriate format'''
     @staticmethod
     def get_image(image_path, width, height, mode, box = None):
         """
@@ -31,71 +27,89 @@ class FromJPEG:
         """
         Get a single image
         """
-        # print('get file')
         data_batch = np.array(
             [FromJPEG.get_image(sample_file, width, height, mode, box=box) for sample_file in image_files]).astype(np.uint8)
         # Make sure the images are in 4 dimensions
         if len(data_batch.shape) < 4:
             data_batch = data_batch.reshape(data_batch.shape + (1,))
-
         return data_batch
-    @staticmethod
-    def get_batches(batch_size,folder,IMAGE_WIDTH,IMAGE_HEIGHT, box = None):
-        """
-        Generate batches
-        """
-        # print('start get_batches')
-        current_index = 0
-        data_files = glob(folder)
-        shape = len(data_files), IMAGE_WIDTH, IMAGE_HEIGHT, 3
-        #TODO
-        labels = None
-        # print(shape[0])
-        while current_index + batch_size <= shape[0]:
-            data_batch = get_batch(
-                data_files[current_index:current_index + batch_size],
-                *shape[1:3], box=box)
-            labels_batch = labels[current_index:current_index + batch_size]
-            # print('got files')
-            current_index += batch_size
-            yield data_batch, labels
 
 if __name__ == '__main__':
-    np.set_printoptions(threshold=np.nan)
+    '''
+    We should get a glob to get all the image files we want to examine
+    We should get a dictionary to map file paths from the glob to indexes
+    Each folder represents a different class
+    Then we should load the images and should write to a binary file
+    '''
     DATA_PATH = '/Data/PersonTracking/test/'
     TRAIN_INPUT_SAVE = '/Data/PersonTracking/test/test_images'
     TRAIN_LABEL_SAVE = '/Data/PersonTracking/test/test_labels'
     WIDTH, HEIGHT = 256, 448
-    batch_size= 10
-    ALL_DATA_PATHS = glob(os.path.join(DATA_PATH,'*','*.png'))
-    CLASS_PATHS = glob(os.path.join(DATA_PATH,'*'))
-    NUM_CLASSES = 1000
-    shuffle(ALL_DATA_PATHS)
+    DEBUG=True
+    #how many images to process at a time
+    #I wrote this code pretty simply so it'll chop off N%batch_size data points
+    #So lower batch size is better
+    ALL_DATA_PATHS = glob(os.path.join(DATA_PATH,'*','*.png')) #Get all data
+    CLASS_PATHS = glob(os.path.join(DATA_PATH,'*/')) #get all classes
+    shuffle(ALL_DATA_PATHS) #shuffle data for good measure
     files_dict = {v.split('/')[4]: i for i, v in enumerate(CLASS_PATHS)}
     print(files_dict)
     i = 0
-    while i != -1:
-        if i+batch_size <= len(ALL_DATA_PATHS):
-            j = i + batch_size
-        else:
-            break
-            j = -1
-        # print(i)
-        labels = np.full(batch_size, 0, dtype = np.int32)
-        for k in range(i,j):
-            class_name = ALL_DATA_PATHS[k].split('/')[4]
-            labels[k-i] = files_dict[class_name]
-        images = FromJPEG.get_batch(ALL_DATA_PATHS[i:j], WIDTH, HEIGHT)
-        # for k in range(10):
-        #     print(labels[k])
-        #     plt.imshow(images[k])
-        #     plt.show()
-        # exit()
-        if len(labels) != len(images):
-            print('MISMATCH-------------------------------')
-            i = j
-            continue
-        append_binary_file(TRAIN_INPUT_SAVE,images.tobytes())
-        append_binary_file(TRAIN_LABEL_SAVE,labels.tobytes())
+    face_cascade = cv2.CascadeClassifier('/home/gtower/.local/lib/python2.7/site-packages/cv2/data/haarcascade_frontalface_default.xml')
+    sess, x, output, importance_map = trainFaces.build_model_inference()
+
+    t_p = 0
+    t_n = 0
+    p = 0.0
+    n = 0.0
+
+    m_t_p = 0
+    m_t_n = 0
+    m_p = 0.0
+    m_n = 0.0
+    while i < len(ALL_DATA_PATHS):#main loop to walk through the files
+        class_name = ALL_DATA_PATHS[i].split('/')[4]
+
+        label = bool(files_dict[class_name])
+        image = FromJPEG.get_image(ALL_DATA_PATHS[i], WIDTH, HEIGHT, 'RGB')#get the images
+        image_float = image.astype(dtype=np.float32)
+        looking, importance_map_ex = sess.run([output,importance_map],feed_dict={x:np.expand_dims(image_float[:,:,::-1],0)})
+        looking = np.squeeze(looking)
+        importance_map_ex = np.squeeze(importance_map_ex)
+        directory = '/home/gtower/Pictures/PersonTracking/' #directory to save the data
+
+        soft_sum = np.sum(np.exp(looking)) #Get softmax probability of the person is looking
+        curr_val = np.exp(looking[1])/soft_sum + .3
+        curr_val = np.round(curr_val)
+        image_g =  cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # print(image)
+        faces = face_cascade.detectMultiScale(image_g, 1.3, 2)
+        guess = bool(len(faces))
+        if guess == label:
+            t_p +=guess
+            t_n+= 1-guess
+        p +=guess
+        n+= 1-guess
+        if curr_val == label:
+            m_t_p +=curr_val
+            m_t_n+= 1-curr_val
+        m_p +=curr_val
+        m_n+= 1-curr_val
         print('ITERS:' ,i)
-        i = j
+        if DEBUG and label==True:
+            for (x,y,w,h) in faces:
+                cv2.rectangle(image_g,(x,y),(x+w,y+h),(0),2)
+            while True:
+                cv2.imshow("image",image_g) #show box
+                key = cv2.waitKey(1)
+                if key & 0xFF == ord('q'): #stop neato and quit if 'q'
+                    break
+
+        i += 1
+    print('TOTAL ACC:', (t_p+t_n)/(p+n))
+    print('TRUE POSITIVE:',t_p/p)
+    print('TRUE NEGATIVE:',t_n/n)
+    print('TOTAL ACC:', (m_t_p+m_t_n)/(m_p+m_n))
+    print('TRUE POSITIVE:',m_t_p/m_p)
+    print('TRUE NEGATIVE:',m_t_n/m_n)

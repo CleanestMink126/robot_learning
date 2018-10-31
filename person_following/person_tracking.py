@@ -34,7 +34,7 @@ class TrackPerson:
         self.get_image = False #whether to graab newest image
         self.image = None #newest image
         self.model = detect_people.DetectorAPI(path_to_ckpt = MODEL_PATH) #Load person detector model
-        self.sess, self.x, self.output = trainFaces.build_model_inference() #Load looking detection model
+        self.sess, self.x, self.output,_ = trainFaces.build_model_inference() #Load looking detection model
         self.publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10) #Velocity Publisher
         rospy.Subscriber('camera/image_raw', Image, self.process_image) #Camera subscriber
 
@@ -124,7 +124,7 @@ class TrackPerson:
                 if key & 0xFF == ord('q'): #stop neato and quit if 'q'
                     self.send_speed(0,0)
                     break
-                    
+
                 self.set_speed(box) # determine proportional speed
                 self.decide_stop(looking) #determine whether or not to stop
                 self.image = None #make sure to wait for a new image
