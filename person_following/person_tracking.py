@@ -103,6 +103,9 @@ class TrackPerson:
         save_data=False #Whether or not to colelct training data
         directory = '/Data/PersonTracking/test/away/' #directory to save the data
         prefix_name = 'away_'
+        # fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        # out = cv2.VideoWriter('output.avi',fourcc, 20.0, (640,480))
+
         while not rospy.is_shutdown():
             self.send_speed(self.forward_velocity, self.turn_velocity)#start off by sending the current speed
             if self.image is not None: #if we have gotten an image
@@ -124,7 +127,7 @@ class TrackPerson:
                 if key & 0xFF == ord('q'): #stop neato and quit if 'q'
                     self.send_speed(0,0)
                     break
-                    
+
                 self.set_speed(box) # determine proportional speed
                 self.decide_stop(looking) #determine whether or not to stop
                 self.image = None #make sure to wait for a new image
