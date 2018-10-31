@@ -56,7 +56,7 @@ def return_datatset_train():
     return tf.data.Dataset.zip((images, labels))
 
 def return_datatset_test():
-    '''Load the testing dataset from a binary file''''
+    '''Load the testing dataset from a binary file'''
     images = tf.data.FixedLengthRecordDataset(
       TEST_INPUT, IMAGE_SIZE[0] * IMAGE_SIZE[1] * IMAGE_SIZE[2]).map(decode_image)
     labels = tf.data.FixedLengthRecordDataset(
@@ -87,7 +87,8 @@ def create_main_model(x_image, reuse = False, is_train = None):
         hid3 = DenseLayer(flat3, HIDDEN_SIZE,act = tf.nn.relu, name ='fcl')
         hid3 = DropoutLayer(hid3, keep=KEEP_PROB,is_train=is_train, is_fix=True, name='drop1')
         y_conv = DenseLayer(hid3, 2,  name = 'output').outputs
-        return y_conv
+        importance_map = tf.nn.tanh(convVals.outputs)
+        return y_conv,importance_map
 
 def build_model(x, og_classes, reuse = False):
     '''Build a model for training and testing'''
@@ -97,7 +98,7 @@ def build_model(x, og_classes, reuse = False):
         prefix = 'train_'
     else:
         prefix = 'test_'
-    main_outputs = create_main_model(x,reuse=reuse)#create model
+    main_outputs,_ = create_main_model(x,reuse=reuse)#create model
     with tf.variable_scope('logistics') as scope:
         image_summary = tf.summary.image(prefix + "inputs", x,max_outputs = NUM_OUTPUTS)#get some example images
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=classes_one, logits=main_outputs))#get cost
@@ -165,11 +166,11 @@ def build_model_inference():
     #define a placeholder (empty box) where we're going to put our data
     x = tf.placeholder(dtype=tf.float32, shape=(1,IMAGE_SIZE[0],IMAGE_SIZE[1],IMAGE_SIZE[2]))
     x_rev = tf.reverse(x,axis=[3])/255.0 #If we're using the neato, convert from BGR to RGB and to [0,1] range
-    main_outputs = create_main_model(x_rev,is_train=False) #Build model
+    main_outputs, importance_map = create_main_model(x_rev,is_train=False) #Build model
     sess.run(tf.global_variables_initializer())
     saver_perm = tf.train.Saver()
     saver_perm.restore(sess, PERM_MODEL_FILEPATH)#Restore model
-    return sess, x, main_outputs
+    return sess, x, main_outputs,importance_map
 
 if __name__ == '__main__':
     sess, x,binary_output = build_model_inference()
