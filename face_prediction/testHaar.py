@@ -45,7 +45,7 @@ if __name__ == '__main__':
     TRAIN_INPUT_SAVE = '/Data/PersonTracking/test/test_images'
     TRAIN_LABEL_SAVE = '/Data/PersonTracking/test/test_labels'
     WIDTH, HEIGHT = 256, 448
-    DEBUG=True
+    DEBUG=False
     #how many images to process at a time
     #I wrote this code pretty simply so it'll chop off N%batch_size data points
     #So lower batch size is better
@@ -55,49 +55,53 @@ if __name__ == '__main__':
     files_dict = {v.split('/')[4]: i for i, v in enumerate(CLASS_PATHS)}
     print(files_dict)
     i = 0
+    #Declare Haar Classifier
     face_cascade = cv2.CascadeClassifier('/home/gtower/.local/lib/python2.7/site-packages/cv2/data/haarcascade_frontalface_default.xml')
+    #Declare my model
     sess, x, output, importance_map = trainFaces.build_model_inference()
-
-    t_p = 0
-    t_n = 0
-    p = 0.0
-    n = 0.0
-
-    m_t_p = 0
-    m_t_n = 0
-    m_p = 0.0
-    m_n = 0.0
+    #For the haar classier
+    t_p = 0#True Positives
+    t_n = 0#True Negatives
+    p = 0.0#Total Positives
+    n = 0.0#Total Negatives
+    #For my classifier
+    m_t_p = 0#True Positives
+    m_t_n = 0#True Negatives
+    m_p = 0.0#Total Positives
+    m_n = 0.0#Total Negatives
     while i < len(ALL_DATA_PATHS):#main loop to walk through the files
-        class_name = ALL_DATA_PATHS[i].split('/')[4]
-
-        label = bool(files_dict[class_name])
+        class_name = ALL_DATA_PATHS[i].split('/')[4]#get the name of the class
+        label = bool(files_dict[class_name])#get the index of the class
         image = FromJPEG.get_image(ALL_DATA_PATHS[i], WIDTH, HEIGHT, 'RGB')#get the images
+
+        #Run my model on the image
         image_float = image.astype(dtype=np.float32)
         looking, importance_map_ex = sess.run([output,importance_map],feed_dict={x:np.expand_dims(image_float[:,:,::-1],0)})
         looking = np.squeeze(looking)
-        importance_map_ex = np.squeeze(importance_map_ex)
-        directory = '/home/gtower/Pictures/PersonTracking/' #directory to save the data
+        importance_map_ex = np.squeeze(importance_map_ex) #The ouput of the convolutional layers
 
         soft_sum = np.sum(np.exp(looking)) #Get softmax probability of the person is looking
         curr_val = np.exp(looking[1])/soft_sum + .3
-        curr_val = np.round(curr_val)
-        image_g =  cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-        # print(image)
-        faces = face_cascade.detectMultiScale(image_g, 1.3, 2)
-        guess = bool(len(faces))
-        if guess == label:
-            t_p +=guess
-            t_n+= 1-guess
-        p +=guess
-        n+= 1-guess
-        if curr_val == label:
+        curr_val = np.round(curr_val) #Get the final 'guess'
+        if curr_val == label: #Some logic to increment the correct values
             m_t_p +=curr_val
             m_t_n+= 1-curr_val
         m_p +=curr_val
         m_n+= 1-curr_val
+
+        #Run the haar model
+        image_g =  cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(image_g, 1.3, 2)
+        guess = bool(len(faces))#Get whether we detect a face
+        if guess == label:#Some logic to increment the correct values for haar
+            t_p +=guess
+            t_n+= 1-guess
+        p +=guess
+        n+= 1-guess
+
         print('ITERS:' ,i)
-        if DEBUG and label==True:
+        if DEBUG and guess==False and label==True:
+            #Potentially show some wrong choices of the haar classifier
             for (x,y,w,h) in faces:
                 cv2.rectangle(image_g,(x,y),(x+w,y+h),(0),2)
             while True:
