@@ -79,6 +79,8 @@ class TrackPerson:
 
     def set_speed(self, box):
         '''Set proportional Control based on where the bounding box is'''
+        x_max = self.image.shape[0]
+
         rectange_center = (box[1] + box[3])//2 #get center of box
         box_dir = float(x_max//2 - rectange_center) #find where center of box is in relation to center of image
         if abs(box_dir) > self.threshold_direction:
@@ -99,6 +101,8 @@ class TrackPerson:
 
     def run(self):
         '''This is the main loop for the Neato to follow a person infront of it'''
+        import time
+        # time.sleep(10)
         r = rospy.Rate(3)#How fast to run the loop
         save_data=False #Whether or not to colelct training data
         directory = '/Data/PersonTracking/test/away/' #directory to save the data
